@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pasaya Live Scheduler</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --purple: #3B0FA0; --purple-l: #6C3FC7; --purple-pale: #EDE9FF; --purple-bg: #F6F4FF;
+  --tt-green: #C8F0D8; --pm-orange: #FFE8C8; --sh-peach: #FFE9DE;
+  --white: #fff; --grey-200: #EFEFEF; --grey-400: #BBBBC0; --grey-600: #6B6B78; --grey-900: #1A1A24;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Noto Sans Thai', sans-serif; background: var(--purple-bg); color: var(--grey-900); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+header { background: var(--purple); padding: 12px 20px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+header h1 { color: white; font-size: 18px; font-weight: 700; }
+.sync-status { margin-left: auto; font-size: 12px; color: rgba(255,255,255,0.7); display: flex; align-items: center; gap: 6px; }
+.sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #4CAF50; }
+.sync-dot.offline { background: #FF9800; }
+.month-nav { display: flex; align-items: center; gap: 8px; margin-left: 16px; }
+.month-nav button { background: rgba(255,255,255,0.15); border: none; color: white; padding: 5px 14px; border-radius: 8px; cursor: pointer; font-size: 18px; }
+.month-nav button:hover { background: rgba(255,255,255,0.25); }
+.month-nav span { color: white; font-size: 16px; font-weight: 600; min-width: 170px; text-align: center; }
+.layout { display: flex; flex: 1; overflow: hidden; }
+.panel { width: 190px; background: white; border-right: 1px solid var(--grey-200); padding: 12px; overflow-y: auto; flex-shrink: 0; }
+.panel h3 { font-size: 11px; font-weight: 700; color: var(--grey-400); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+.tab-row { display: flex; gap: 4px; margin-bottom: 10px; }
+.tab { flex: 1; padding: 5px; border: 1.5px solid var(--grey-200); background: none; border-radius: 8px; font-size: 11px; cursor: pointer; font-family: inherit; transition: all 0.15s; text-align: center; }
+.tab.mc-active { border-color: var(--purple); background: var(--purple-pale); color: var(--purple); font-weight: 600; }
+.tab.adm-active { border-color: #FFD97A; background: #FFF3CD; color: #7A5900; font-weight: 600; }
+.chips { display: flex; flex-direction: column; gap: 5px; }
+.chip { padding: 7px 10px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: grab; user-select: none; transition: transform 0.1s, opacity 0.1s; }
+.chip.mc { background: var(--purple-pale); color: var(--purple); }
+.chip.admin { background: #FFF3CD; color: #7A5900; }
+.chip:active { cursor: grabbing; opacity: 0.6; transform: scale(0.96); }
+.add-person { display: flex; gap: 4px; margin-top: 8px; }
+.add-person input { flex: 1; padding: 6px 8px; border: 1.5px solid var(--grey-200); border-radius: 8px; font-size: 12px; font-family: inherit; }
+.add-person input:focus { outline: none; border-color: var(--purple-l); }
+.add-person button { padding: 6px 10px; background: var(--purple); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 700; }
+.cal-wrap { flex: 1; overflow: auto; padding: 12px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; min-width: 900px; }
+.dow-header { text-align: center; font-size: 12px; font-weight: 700; color: white; background: var(--purple); padding: 8px 4px; border-radius: 8px; }
+.cal-cell { background: white; border-radius: 10px; min-height: 120px; padding: 6px; border: 2px solid transparent; transition: border-color 0.15s; }
+.cal-cell.empty { background: rgba(255,255,255,0.35); }
+.cal-cell.dragover { border-color: var(--purple-l); background: var(--purple-pale); }
+.day-num { font-size: 14px; font-weight: 700; color: var(--purple); margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; }
+.add-btn { opacity: 0; font-size: 16px; background: none; border: none; cursor: pointer; color: var(--purple); transition: opacity 0.15s; padding: 0 2px; line-height: 1; }
+.cal-cell:hover .add-btn { opacity: 1; }
+.today-dot { width: 22px; height: 22px; background: var(--purple); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+.event-pill { border-radius: 7px; padding: 4px 7px; margin-bottom: 3px; cursor: pointer; position: relative; transition: opacity 0.15s; }
+.event-pill:hover { opacity: 0.85; }
+.event-pill.shopee { background: var(--sh-peach); }
+.event-pill.tt-park { background: var(--tt-green); }
+.event-pill.tt-pm { background: var(--pm-orange); }
+.event-pill.tiktok { background: #E8E8E8; }
+.pill-time { font-size: 10px; color: #888; font-family: 'DM Mono', monospace; }
+.pill-mc { font-size: 12px; font-weight: 600; color: var(--purple); line-height: 1.3; }
+.pill-admin { font-size: 10px; color: #7A5900; }
+.pill-del { position: absolute; top: 3px; right: 4px; background: none; border: none; cursor: pointer; font-size: 11px; color: #ccc; display: none; }
+.event-pill:hover .pill-del { display: block; }
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 200; backdrop-filter: blur(4px); }
+.modal { background: white; border-radius: 18px; padding: 26px; width: 420px; max-width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+.modal h3 { font-size: 18px; font-weight: 700; color: var(--purple); margin-bottom: 18px; }
+.fg { margin-bottom: 13px; }
+.fg label { display: block; font-size: 12px; font-weight: 600; color: var(--grey-600); margin-bottom: 4px; }
+.fg select, .fg input { width: 100%; padding: 9px 11px; border: 1.5px solid var(--grey-200); border-radius: 10px; font-size: 14px; font-family: inherit; }
+.fg select:focus, .fg input:focus { outline: none; border-color: var(--purple-l); }
+.time-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.drop-zone { min-height: 42px; border: 2px dashed var(--grey-200); border-radius: 8px; padding: 6px 8px; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; transition: all 0.15s; }
+.drop-zone.over { border-color: var(--purple-l); background: var(--purple-pale); }
+.drop-label { font-size: 11px; color: var(--grey-400); }
+.dtag { padding: 3px 9px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.dtag.mc { background: var(--purple-pale); color: var(--purple); }
+.dtag.admin { background: #FFF3CD; color: #7A5900; }
+.modal-btns { display: flex; gap: 8px; margin-top: 18px; }
+.btn-c { flex: 1; padding: 11px; border: 1.5px solid var(--grey-200); background: none; border-radius: 10px; cursor: pointer; font-size: 14px; font-family: inherit; }
+.btn-s { flex: 2; padding: 11px; background: var(--purple); color: white; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 700; font-family: inherit; }
+.btn-s:hover { background: var(--purple-l); }
+.readonly-badge { background: rgba(255,255,255,0.2); color: white; font-size: 11px; padding: 3px 8px; border-radius: 6px; }
+
+/* ===== MOBILE RESPONSIVE ===== */
+@media (max-width: 768px) {
+  body { overflow: auto !important; height: auto !important; }
+  .layout { flex-direction: column; overflow: auto; height: auto; }
+  
+  /* Hide sidebar on mobile, show as horizontal scroll */
+  .panel { 
+    width: 100%; border-right: none; 
+    border-bottom: 1px solid var(--grey-200);
+    padding: 10px 12px;
+  }
+  .chips { flex-direction: row; flex-wrap: wrap; gap: 5px; }
+  .chip { padding: 5px 10px; font-size: 12px; }
+  .add-person { margin-top: 6px; }
+  
+  /* Calendar as list on mobile */
+  .cal-wrap { padding: 8px; overflow: auto; }
+  .cal-grid { 
+    display: flex !important; 
+    flex-direction: column !important; 
+    gap: 8px !important;
+    min-width: unset !important;
+  }
+  .dow-header { display: none !important; }
+  .cal-cell.empty { display: none !important; }
+  .cal-cell { 
+    min-height: unset !important; 
+    border-radius: 10px !important;
+    border: 1px solid var(--grey-200) !important;
+  }
+  .cal-cell:empty { display: none; }
+  
+  /* Bigger text on mobile */
+  .day-num { font-size: 16px !important; }
+  .pill-mc { font-size: 13px !important; }
+  .pill-time { font-size: 11px !important; }
+  .add-btn { opacity: 1 !important; }
+  
+  /* Header */
+  header { flex-wrap: wrap; gap: 8px; padding: 10px 14px; }
+  header h1 { font-size: 16px; }
+  .month-nav { margin-left: 0; }
+  .month-nav span { min-width: 130px; font-size: 14px; }
+  .sync-status { font-size: 11px; }
+  #modeBadge { font-size: 11px; }
+}
+
+</style>
+</head>
+<body>
+<header>
+  <h1>🎙️ Pasaya Live Scheduler</h1>
+  <span class="readonly-badge" id="modeBadge">👁️ View only</span>
+  <div class="sync-status"><div class="sync-dot" id="syncDot"></div><span id="syncText">กำลังเชื่อมต่อ...</span></div>
+  <div class="month-nav">
+    <button onclick="chMonth(-1)">‹</button>
+    <span id="mTitle"></span>
+    <button onclick="chMonth(1)">›</button>
+  </div>
+</header>
+<div class="layout">
+  <div class="panel">
+    <h3>รายชื่อ</h3>
+    <div class="tab-row">
+      <button class="tab mc-active" id="tabMC" onclick="setRole('mc')">🎤 MC</button>
+      <button class="tab" id="tabAdmin" onclick="setRole('admin')">⚡ แอดมิน</button>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div id="addPersonArea" style="display:none">
+      <div class="add-person">
+        <input id="newName" placeholder="ชื่อ..." onkeydown="if(event.key==='Enter')addPerson()">
+        <button onclick="addPerson()">+</button>
+      </div>
+    </div>
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--grey-200)">
+      <div style="font-size:11px;color:var(--grey-400);margin-bottom:6px;font-weight:600;">โหมด</div>
+      <div id="modeInfo" style="font-size:12px;color:var(--grey-600);">👁️ ดูอย่างเดียว</div>
+      <button onclick="toggleEditMode()" id="editBtn" style="margin-top:6px;width:100%;padding:6px;border:1.5px solid var(--grey-200);border-radius:8px;background:none;cursor:pointer;font-size:12px;font-family:inherit;">🔐 แก้ไข (Admin)</button>
+    </div>
+  </div>
+  <div class="cal-wrap">
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+</div>
+
+<!-- Password Modal -->
+<div class="overlay" id="pwOverlay" style="display:none">
+  <div class="modal">
+    <h3>🔐 Admin Login</h3>
+    <div class="fg">
+      <label>รหัสผ่าน</label>
+      <input type="password" id="pwInput" placeholder="ใส่รหัสผ่าน..." onkeydown="if(event.key==='Enter')checkPw()">
+    </div>
+    <div class="modal-btns">
+      <button class="btn-c" onclick="document.getElementById('pwOverlay').style.display='none'">ยกเลิก</button>
+      <button class="btn-s" onclick="checkPw()">เข้าสู่ระบบ</button>
+    </div>
+    <div id="pwError" style="color:red;font-size:12px;margin-top:8px;display:none">รหัสผ่านไม่ถูกต้อง</div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="overlay" id="overlay" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3 id="modalTitle">เพิ่มไลฟ์</h3>
+    <div class="fg"><label>Platform</label>
+      <select id="fPlat">
+        <option value="shopee">🛒 Shopee / Lazada</option>
+        <option value="tiktok">🎵 TikTok</option>
+      </select>
+    </div>
+    <div class="fg" id="locationField" style="display:none"><label>📍 สถานที่ไลฟ์</label>
+      <input type="text" id="fLocation" placeholder="เช่น Park Silom, PM River, Studio..." list="locationSuggestions">
+      <datalist id="locationSuggestions">
+        <option value="Park Silom">
+        <option value="PM River">
+        <option value="PM Riverside">
+        <option value="Studio">
+      </datalist>
+    </div>
+    <div class="fg"><label>เวลา</label>
+      <div class="time-row">
+        <input type="time" id="fStart" value="21:00">
+        <input type="time" id="fEnd" value="00:00">
+      </div>
+    </div>
+    <div class="fg"><label>MC</label>
+      <div class="drop-zone" id="dzMC"><span class="drop-label">วาง MC ที่นี่</span></div>
+    </div>
+    <div class="fg"><label>แอดมิน</label>
+      <div class="drop-zone" id="dzAdmin"><span class="drop-label">วาง แอดมิน ที่นี่</span></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-c" onclick="closeModal()">ยกเลิก</button>
+      <button class="btn-s" onclick="saveEvent()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAcHnAP7EI2x-JdP1YdUj99M0OgnoHNckc",
+  authDomain: "pasaya-live.firebaseapp.com",
+  databaseURL: "https://pasaya-live-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "pasaya-live",
+  storageBucket: "pasaya-live.firebasestorage.app",
+  messagingSenderId: "132239920616",
+  appId: "1:132239920616:web:879ac1e37a5d761926285d",
+  measurementId: "G-1HC952FWEM"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const ADMIN_PASSWORD = "pasaya2026";
+
+const THAI_MONTHS = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+const THAI_DAYS = ["อาทิตย์","จันทร์","อังคาร","พุธ","พฤหัส","ศุกร์","เสาร์"];
+const PLAT_LABELS = { shopee:'🛒 Shopee/Lazada', tiktok:'🎵 TikTok' };
+
+let curY=2026, curM=5, role='mc', editDay=null, editIdx=null;
+let isAdmin = false;
+let sched = {};
+
+const people = {
+  mc: ["พัทโตะ","เกมส์","หนึ่ง","หมวย","มายด์","ลูกไม้","โฟน","พลอย","เมย์"],
+  admin: ["เกมส์","ฟลุ้ค","มิ้น"]
+};
+
+const preloaded = {
+  "2026-6-2":  [{platform:"shopee",  timeStart:"21:00",timeEnd:"00:00",mc:["เมย์"],      admin:["เกมส์"]}],
+  "2026-6-4":  [{platform:"tiktok",location:"Park Silom", timeStart:"18:30",timeEnd:"23:00",mc:["พัทโตะ"],    admin:["กอล์ฟ","ฟลุ้ค"]},
+                {platform:"tiktok",location:"PM River",   timeStart:"18:30",timeEnd:"23:00",mc:["โฟน"],        admin:["มิ้น"]}],
+  "2026-6-5":  [{platform:"tiktok",location:"Park Silom", timeStart:"18:30",timeEnd:"23:00",mc:["ลูกไม้"],    admin:["กอล์ฟ","ฟลุ้ค"]},
+                {platform:"tiktok",location:"PM River",   timeStart:"18:30",timeEnd:"23:00",mc:["เมย์"],       admin:["มิ้น"]},
+                {platform:"shopee",  timeStart:"21:00",timeEnd:"00:00",mc:["หมวย","เกมส์"],admin:[]}],
+  "2026-6-6":  [{platform:"shopee",  timeStart:"11:00",timeEnd:"13:00",mc:["เมย์"],      admin:["ฟลุ้ค"]},
+                {platform:"tiktok",location:"Park Silom", timeStart:"18:30",timeEnd:"23:00",mc:["ลูกไม้"],    admin:["กอล์ฟ","ฟลุ้ค"]},
+                {platform:"tiktok",location:"PM River",   timeStart:"18:30",timeEnd:"23:00",mc:["เมย์"],       admin:["มิ้น"]},
+                {platform:"shopee",  timeStart:"21:00",timeEnd:"00:00",mc:["หมวย","เกมส์"],admin:[]}],
+  "2026-6-7":  [{platform:"tiktok",location:"Park Silom", timeStart:"18:30",timeEnd:"23:00",mc:["พัทโตะ"],    admin:["กอล์ฟ","ฟลุ้ค"]},
+                {platform:"tiktok",location:"PM River",   timeStart:"18:30",timeEnd:"23:00",mc:["ลูกไม้"],    admin:["มิ้น"]},
+                {platform:"shopee",  timeStart:"21:00",timeEnd:"00:00",mc:["เมย์","เกมส์"],admin:[]}],
+  "2026-6-8":  [{platform:"tiktok",location:"PM River",   timeStart:"18:30",timeEnd:"23:00",mc:["พัทโตะ","ลูกไม้"],admin:["มิ้น","ฟลุ้ค"]}],
+  "2026-6-9":  [{platform:"tiktok",location:"PM River",   timeStart:"18:30",timeEnd:"23:00",mc:["พัทโตะ","โฟน"],  admin:["มิ้น","ฟลุ้ค"]},
+                {platform:"shopee",  timeStart:"21:00",timeEnd:"00:00",mc:["เมย์","เกมส์"],   admin:[]}],
+  "2026-6-10": [{platform:"tiktok",location:"PM River",   timeStart:"18:30",timeEnd:"23:00",mc:["พัทโตะ","โฟน"],  admin:["มิ้น","ฟลุ้ค"]}],
+  "2026-6-11": [{platform:"shopee",  timeStart:"21:00",timeEnd:"00:00",mc:["โฟน"],        admin:["เกมส์"]}],
+  "2026-6-14": [{platform:"shopee",  timeStart:"21:00",timeEnd:"01:00",mc:["ลูกไม้","เมย์"],admin:[]}],
+  "2026-6-15": [{platform:"shopee",  timeStart:"11:00",timeEnd:"13:00",mc:["เมย์"],       admin:["เกมส์"]}],
+  "2026-6-16": [{platform:"shopee",  timeStart:"21:00",timeEnd:"00:00",mc:["โฟน"],        admin:["เกมส์"]}],
+  "2026-6-18": [{platform:"shopee",  timeStart:"21:00",timeEnd:"00:00",mc:["ลูกไม้"],    admin:["เกมส์"]}],
+  "2026-6-23": [{platform:"shopee",  timeStart:"21:00",timeEnd:"00:00",mc:["โฟน"],        admin:["เกมส์"]}],
+  "2026-6-24": [{platform:"shopee",  timeStart:"21:00",timeEnd:"01:00",mc:["เมย์","เกมส์"],admin:[]}],
+  "2026-6-25": [{platform:"shopee",  timeStart:"11:00",timeEnd:"13:00",mc:["เมย์"],       admin:["ฟลุ้ค"]},
+                {platform:"shopee",  timeStart:"21:00",timeEnd:"00:00",mc:["โฟน","เมย์"], admin:[]}],
+  "2026-6-27": [{platform:"shopee",  timeStart:"21:00",timeEnd:"00:00",mc:["ลูกไม้","เมย์"],admin:[]}],
+  "2026-6-30": [{platform:"shopee",  timeStart:"21:00",timeEnd:"00:00",mc:["โฟน"],        admin:["เกมส์"]}],
+};
+
+// Firebase sync
+const schedRef = ref(db, 'schedule');
+
+// Listen for changes
+onValue(schedRef, (snapshot) => {
+  const data = snapshot.val();
+  if (data) {
+    sched = data;
+  } else {
+    // First time: upload preloaded data
+    sched = JSON.parse(JSON.stringify(preloaded));
+    set(schedRef, sched);
+  }
+  document.getElementById('syncDot').className = 'sync-dot';
+  document.getElementById('syncText').textContent = 'เชื่อมต่อแล้ว ✓';
+  renderCal();
+}, (error) => {
+  document.getElementById('syncDot').className = 'sync-dot offline';
+  document.getElementById('syncText').textContent = 'ออฟไลน์';
+});
+
+function saveToFirebase() {
+  set(schedRef, sched);
+}
+
+// ADMIN
+window.toggleEditMode = function() {
+  if (isAdmin) {
+    isAdmin = false;
+    updateAdminUI();
+  } else {
+    document.getElementById('pwOverlay').style.display = 'flex';
+    setTimeout(() => document.getElementById('pwInput').focus(), 100);
+  }
+}
+
+window.checkPw = function() {
+  const pw = document.getElementById('pwInput').value;
+  if (pw === ADMIN_PASSWORD) {
+    isAdmin = true;
+    document.getElementById('pwOverlay').style.display = 'none';
+    document.getElementById('pwInput').value = '';
+    document.getElementById('pwError').style.display = 'none';
+    updateAdminUI();
+  } else {
+    document.getElementById('pwError').style.display = 'block';
+  }
+}
+
+function updateAdminUI() {
+  const badge = document.getElementById('modeBadge');
+  const modeInfo = document.getElementById('modeInfo');
+  const editBtn = document.getElementById('editBtn');
+  const addArea = document.getElementById('addPersonArea');
+  if (isAdmin) {
+    badge.textContent = '✏️ Admin Mode';
+    badge.style.background = 'rgba(255,200,0,0.3)';
+    modeInfo.textContent = '✏️ แก้ไขได้';
+    editBtn.textContent = '🔓 ออกจาก Admin';
+    addArea.style.display = 'block';
+  } else {
+    badge.textContent = '👁️ View only';
+    badge.style.background = 'rgba(255,255,255,0.2)';
+    modeInfo.textContent = '👁️ ดูอย่างเดียว';
+    editBtn.textContent = '🔐 แก้ไข (Admin)';
+    addArea.style.display = 'none';
+  }
+  renderCal();
+}
+
+// Toggle location field
+function toggleLocationField() {
+  const plat = document.getElementById('fPlat').value;
+  const locField = document.getElementById('locationField');
+  if(plat === 'tiktok') {
+    locField.style.display = 'block';
+  } else {
+    locField.style.display = 'none';
+    document.getElementById('fLocation').value = '';
+  }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('fPlat').addEventListener('change', toggleLocationField);
+});
+
+// PEOPLE
+window.setRole = function(r) {
+  role = r;
+  document.getElementById('tabMC').className = 'tab'+(r==='mc'?' mc-active':'');
+  document.getElementById('tabAdmin').className = 'tab'+(r==='admin'?' adm-active':'');
+  renderChips();
+}
+
+window.addPerson = function() {
+  const n = document.getElementById('newName').value.trim();
+  if (!n) return;
+  if (!people[role].includes(n)) { people[role].push(n); renderChips(); }
+  document.getElementById('newName').value = '';
+}
+
+function renderChips() {
+  const c = document.getElementById('chips'); c.innerHTML = '';
+  people[role].forEach(name => {
+    const el = document.createElement('div');
+    el.className = `chip ${role}`; el.textContent = name;
+    if (isAdmin) {
+      el.draggable = true;
+      el.ondragstart = e => { e.dataTransfer.setData('name',name); e.dataTransfer.setData('role',role); };
+      el.onclick = () => addToZone(name, role);
+    }
+    c.appendChild(el);
+  });
+}
+
+// CALENDAR
+window.chMonth = function(d) {
+  curM += d;
+  if (curM>11){curM=0;curY++;} if (curM<0){curM=11;curY--;}
+  renderCal();
+}
+
+function renderCal() {
+  document.getElementById('mTitle').textContent = `${THAI_MONTHS[curM]} ${curY+543}`;
+  const grid = document.getElementById('calGrid'); grid.innerHTML = '';
+  THAI_DAYS.forEach(d => { const h=document.createElement('div'); h.className='dow-header'; h.textContent=d; grid.appendChild(h); });
+  const first=new Date(curY,curM,1).getDay(), days=new Date(curY,curM+1,0).getDate(), today=new Date();
+  for(let i=0;i<first;i++){const e=document.createElement('div');e.className='cal-cell empty';grid.appendChild(e);}
+  for(let d=1;d<=days;d++){
+    const cell=document.createElement('div'); cell.className='cal-cell';
+    const isToday=d===today.getDate()&&curM===today.getMonth()&&curY===today.getFullYear();
+    const dn=document.createElement('div'); dn.className='day-num';
+    dn.innerHTML=isToday?`<span class="today-dot">${d}</span>`:`<span>${d}</span>`;
+    if (isAdmin) {
+      const ab=document.createElement('button'); ab.className='add-btn'; ab.textContent='+'; ab.onclick=()=>openModal(d);
+      dn.appendChild(ab);
+      cell.ondragover=e=>{e.preventDefault();cell.classList.add('dragover');};
+      cell.ondragleave=()=>cell.classList.remove('dragover');
+      cell.ondrop=e=>{e.preventDefault();cell.classList.remove('dragover');quickDrop(d,e.dataTransfer.getData('name'),e.dataTransfer.getData('role'));};
+    }
+    cell.appendChild(dn);
+    const k=key(d); const evs=sched[k]||[];
+    evs.forEach((ev,i)=>cell.appendChild(buildPill(ev,d,i)));
+    grid.appendChild(cell);
+  }
+}
+
+function key(d) { return `${curY}-${curM+1}-${d}`; }
+
+function buildPill(ev,d,i){
+  const pill=document.createElement('div'); pill.className=`event-pill ${ev.platform}`;
+  const mc=(ev.mc||[]).join(' + ')||'—'; const admin=(ev.admin||[]).length?(ev.admin||[]).join('+'):'';
+  const locStr = ev.location ? `📍 ${ev.location} · ` : '';
+  pill.innerHTML=`<div class="pill-time">${locStr}${ev.timeStart}–${ev.timeEnd} · ${PLAT_LABELS[ev.platform]||''}</div><div class="pill-mc">${mc}</div>${admin?`<div class="pill-admin">⚡ ${admin}</div>`:''}`;
+  if (isAdmin) {
+    pill.innerHTML += `<button class="pill-del" onclick="event.stopPropagation();delEvent('${d}',${i})">✕</button>`;
+    pill.onclick=()=>openModal(d,i);
+  }
+  return pill;
+}
+
+function quickDrop(d,name,r){
+  if(!name)return;
+  const k=key(d); if(!sched[k])sched[k]=[];
+  if(sched[k].length>0){const last=sched[k][sched[k].length-1];if(r==='mc'&&!last.mc.includes(name))last.mc.push(name);if(r==='admin'&&!last.admin.includes(name))last.admin.push(name);}
+  else{const ev={platform:'shopee',timeStart:'21:00',timeEnd:'00:00',mc:[],admin:[]};if(r==='mc')ev.mc.push(name);else ev.admin.push(name);sched[k].push(ev);}
+  saveToFirebase(); renderCal();
+}
+
+window.delEvent = function(d,i){
+  const k=key(d); sched[k].splice(i,1); if(!sched[k].length)delete sched[k]; saveToFirebase(); renderCal();
+}
+
+window.openModal = function(d,idx=null){
+  if(!isAdmin) return;
+  editDay=d;editIdx=idx;
+  document.getElementById('modalTitle').textContent=idx!==null?`แก้ไขไลฟ์ วันที่ ${d}`:`เพิ่มไลฟ์ วันที่ ${d}`;
+  clearZones();
+  if(idx!==null){const ev=sched[key(d)][idx];document.getElementById('fPlat').value=ev.platform;document.getElementById('fStart').value=ev.timeStart;document.getElementById('fEnd').value=ev.timeEnd;document.getElementById('fLocation').value=ev.location||'';(ev.mc||[]).forEach(n=>addToZone(n,'mc'));(ev.admin||[]).forEach(n=>addToZone(n,'admin'));}
+  else{document.getElementById('fPlat').value='shopee';document.getElementById('fStart').value='21:00';document.getElementById('fEnd').value='00:00';document.getElementById('fLocation').value='';}
+  toggleLocationField();
+  setupZone('dzMC','mc');setupZone('dzAdmin','admin');
+  document.getElementById('overlay').style.display='flex';
+}
+
+window.closeModal = function(){document.getElementById('overlay').style.display='none';editDay=null;editIdx=null;}
+
+function clearZones(){
+  ['dzMC','dzAdmin'].forEach((id,i)=>{const z=document.getElementById(id);z.innerHTML=`<span class="drop-label">${i===0?'วาง MC ที่นี่':'วาง แอดมิน ที่นี่'}</span>`;});
+}
+
+function setupZone(id,r){
+  const z=document.getElementById(id);
+  z.ondragover=e=>{e.preventDefault();z.classList.add('over');};
+  z.ondragleave=()=>z.classList.remove('over');
+  z.ondrop=e=>{e.preventDefault();z.classList.remove('over');if(e.dataTransfer.getData('role')===r)addToZone(e.dataTransfer.getData('name'),r);};
+}
+
+function addToZone(name,r){
+  const z=document.getElementById(r==='mc'?'dzMC':'dzAdmin');
+  const lbl=z.querySelector('.drop-label');if(lbl)lbl.remove();
+  if(Array.from(z.querySelectorAll('.dtag')).map(t=>t.dataset.n).includes(name))return;
+  const tag=document.createElement('span');tag.className=`dtag ${r}`;tag.dataset.n=name;tag.textContent=name;
+  tag.onclick=()=>{tag.remove();if(!z.querySelector('.dtag'))z.innerHTML=`<span class="drop-label">${r==='mc'?'วาง MC ที่นี่':'วาง แอดมิน ที่นี่'}</span>`;};
+  z.appendChild(tag);
+}
+
+window.saveEvent = function(){
+  const k=key(editDay); if(!sched[k])sched[k]=[];
+  const ev={platform:document.getElementById('fPlat').value,location:document.getElementById('fLocation').value.trim(),timeStart:document.getElementById('fStart').value,timeEnd:document.getElementById('fEnd').value,mc:Array.from(document.getElementById('dzMC').querySelectorAll('.dtag')).map(t=>t.dataset.n),admin:Array.from(document.getElementById('dzAdmin').querySelectorAll('.dtag')).map(t=>t.dataset.n)};
+  if(editIdx!==null)sched[k][editIdx]=ev;else sched[k].push(ev);
+  sched[k].sort((a,b)=>a.timeStart.localeCompare(b.timeStart));
+  saveToFirebase(); renderCal(); closeModal();
+}
+
+// Init
+renderChips();
+renderCal();
+</script>
+</body>
+</html>
